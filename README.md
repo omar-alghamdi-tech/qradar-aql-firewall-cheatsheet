@@ -1,11 +1,11 @@
-# 🛡️ AQL Reference for Firewall Log Analysis in IBM QRadar
+#  AQL Reference for Firewall Log Analysis in IBM QRadar
 
 📥 [Download the original Cheat Sheet (PDF) here](1750675704325.pdf)
 
-## 📌 Overview
+##  Overview
 This cheat sheet provides a comprehensive collection of ready-to-use Ariel Query Language (AQL) queries designed for IBM QRadar. It assists Security Operations Center (SOC) analysts and cybersecurity professionals in accelerating the detection, investigation, and hunting of security incidents through firewall log analysis.
 
-## 📊 AQL Query Cheat Sheet
+##  AQL Query Cheat Sheet
 
 ### 1. Top Blocked Source IPs
 Identifies the most frequently blocked or denied source IP addresses.
@@ -120,7 +120,7 @@ LAST 7 DAYS
 ```
 
 ---
-**💡 General Implementation Notes:**
+**General Implementation Notes:**
 * **Log Source ID:** Verify and update `logsourceid = 71` to match the specific firewall log source ID in your QRadar environment.
 * **Timeframe:** Queries utilize `LAST 7 DAYS` as a default timeframe, which can be adjusted as needed.
 * **Field Parsing:** Field names such as `action`, `destinationPort`, and `sourceIP` may vary based on the specific device type (DSM) or log format.
