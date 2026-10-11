@@ -1,14 +1,15 @@
-# 🛡️ AQL Reference for Firewall Log Analysis in IBM QRadar
 
-📥 [Download the Cheat Sheet (PDF)](qradar-aql-firewall-cheatsheet.pdf)
+#  AQL Reference for Firewall Log Analysis in IBM QRadar
 
-## 📌 Overview
+[qradar-aql-firewall-cheatsheet.pdf.pdf](https://github.com/user-attachments/files/33313700/qradar-aql-firewall-cheatsheet.pdf.pdf)
+
+##  Overview
 
 A collection of ready-to-use **Ariel Query Language (AQL)** queries for IBM QRadar, built to help SOC analysts speed up detection, investigation, and threat hunting through firewall log analysis.
 
 All queries use **native QRadar fields and functions** (e.g. `CATEGORYNAME()`, `eventdirection`, `GEO::LOOKUP()`, `REFERENCESETCONTAINS()`), so they work without relying on custom properties unless noted.
 
-## ⚙️ Before You Start
+##  Before You Start
 
 Replace `'FW-01'` in every query with your firewall's log source name. To list your log sources:
 
@@ -24,7 +25,7 @@ LAST 24 HOURS
 
 ---
 
-## 📊 Query Cheat Sheet
+##  Query Cheat Sheet
 
 ### 1. Top Blocked Source IPs
 Most frequently denied source IPs — a quick view of who is knocking on your perimeter.
@@ -157,7 +158,7 @@ LAST 7 DAYS
 
 ---
 
-## 💡 Implementation Notes
+##  Implementation Notes
 
 - **Category names** (`Firewall Deny`, `Firewall Permit`, login success/failure) come from QRadar's normalized low-level categories, so they work across firewall vendors (DSMs).
 - **Thresholds** (`> 15`, `> 1000`, `> 5`) are starting points — baseline your environment and tune them to reduce false positives.
