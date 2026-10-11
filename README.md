@@ -1,7 +1,8 @@
 
 #  AQL Reference for Firewall Log Analysis in IBM QRadar
 
-[qradar-aql-firewall-cheatsheet.pdf.pdf](https://github.com/user-attachments/files/33313700/qradar-aql-firewall-cheatsheet.pdf.pdf)
+
+[Download the Cheat Sheet (PDF)](qradar-aql-firewall-cheatsheet.pdf)
 
 ##  Overview
 
