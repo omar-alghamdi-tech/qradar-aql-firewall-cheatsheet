@@ -1,6 +1,8 @@
+
 #  AQL Reference for Firewall Log Analysis in IBM QRadar
 
-📥 [Download the original Cheat Sheet (PDF) here](1750675704325.pdf)
+ [Download the original Cheat Sheet (PDF) here]
+[qradar-aql-firewall-cheatsheet.pdf.pdf](https://github.com/user-attachments/files/33313389/qradar-aql-firewall-cheatsheet.pdf.pdf)
 
 ##  Overview
 This cheat sheet provides a comprehensive collection of ready-to-use Ariel Query Language (AQL) queries designed for IBM QRadar. It assists Security Operations Center (SOC) analysts and cybersecurity professionals in accelerating the detection, investigation, and hunting of security incidents through firewall log analysis.
