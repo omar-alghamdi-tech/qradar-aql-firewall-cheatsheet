@@ -1,128 +1,170 @@
+# 🛡️ AQL Reference for Firewall Log Analysis in IBM QRadar
 
-#  AQL Reference for Firewall Log Analysis in IBM QRadar
+📥 [Download the Cheat Sheet (PDF)](qradar-aql-firewall-cheatsheet.pdf)
 
- [Download the original Cheat Sheet (PDF) here]
-[qradar-aql-firewall-cheatsheet.pdf.pdf](https://github.com/user-attachments/files/33313389/qradar-aql-firewall-cheatsheet.pdf.pdf)
+## 📌 Overview
 
-##  Overview
-This cheat sheet provides a comprehensive collection of ready-to-use Ariel Query Language (AQL) queries designed for IBM QRadar. It assists Security Operations Center (SOC) analysts and cybersecurity professionals in accelerating the detection, investigation, and hunting of security incidents through firewall log analysis.
+A collection of ready-to-use **Ariel Query Language (AQL)** queries for IBM QRadar, built to help SOC analysts speed up detection, investigation, and threat hunting through firewall log analysis.
 
-##  AQL Query Cheat Sheet
+All queries use **native QRadar fields and functions** (e.g. `CATEGORYNAME()`, `eventdirection`, `GEO::LOOKUP()`, `REFERENCESETCONTAINS()`), so they work without relying on custom properties unless noted.
+
+## ⚙️ Before You Start
+
+Replace `'FW-01'` in every query with your firewall's log source name. To list your log sources:
+
+```sql
+SELECT LOGSOURCENAME(logsourceid) AS log_source, COUNT(*) AS events
+FROM events
+GROUP BY logsourceid
+ORDER BY events DESC
+LAST 24 HOURS
+```
+
+> Filtering by log source **name** instead of a hard-coded `logsourceid` makes the queries portable and easier to read.
+
+---
+
+## 📊 Query Cheat Sheet
 
 ### 1. Top Blocked Source IPs
-Identifies the most frequently blocked or denied source IP addresses.
+Most frequently denied source IPs — a quick view of who is knocking on your perimeter.
+
 ```sql
-SELECT sourceIP, COUNT(*) AS attempts
+SELECT sourceip, COUNT(*) AS attempts
 FROM events
-WHERE logsourceid = 71
-AND (LOWER(action) = 'deny' OR LOWER(action) = 'block')
-GROUP BY sourceIP
+WHERE LOGSOURCENAME(logsourceid) = 'FW-01'
+  AND CATEGORYNAME(category) = 'Firewall Deny'
+GROUP BY sourceip
 ORDER BY attempts DESC
 LAST 7 DAYS
 ```
 
-### 2. Unusual Destination Ports
-Analyzes network connections targeting uncommon or non-standard destination ports.
+### 2. Unusual Destination Ports (Outbound)
+Allowed outbound connections to non-standard ports — possible C2, tunneling, or shadow IT.
+
 ```sql
-SELECT destinationPort, destinationIP, COUNT(*) AS count
+SELECT sourceip, destinationip, destinationport, COUNT(*) AS connections
 FROM events
-WHERE logsourceid = 71
-AND destinationPort NOT IN (80, 443, 22, 53, 25, 21)
-GROUP BY destinationPort, destinationIP
-ORDER BY count DESC
+WHERE LOGSOURCENAME(logsourceid) = 'FW-01'
+  AND CATEGORYNAME(category) = 'Firewall Permit'
+  AND eventdirection = 'L2R'
+  AND destinationport NOT IN (80, 443, 22, 53, 25, 21)
+GROUP BY sourceip, destinationip, destinationport
+ORDER BY connections DESC
 LAST 7 DAYS
 ```
 
 ### 3. Port Scanning Detection
-Detects potential port scanning activities by identifying source IPs accessing a high number of unique destination ports.
+Sources hitting a high number of distinct destination ports.
+
 ```sql
-SELECT sourceIP, COUNT(DISTINCT destinationPort) AS unique_ports
+SELECT sourceip, UNIQUECOUNT(destinationport) AS unique_ports, COUNT(*) AS attempts
 FROM events
-WHERE logsourceid = 71
-GROUP BY sourceIP
-HAVING unique_ports > 15
+WHERE LOGSOURCENAME(logsourceid) = 'FW-01'
+GROUP BY sourceip
+HAVING UNIQUECOUNT(destinationport) > 15
 ORDER BY unique_ports DESC
+LAST 24 HOURS
+```
+
+### 4. Outbound Connection Spikes (Hourly)
+Internal hosts generating an abnormal volume of outbound connections per hour.
+
+```sql
+SELECT sourceip, DATEFORMAT(starttime, 'yyyy-MM-dd HH:00') AS hour_bucket, COUNT(*) AS connections
+FROM events
+WHERE LOGSOURCENAME(logsourceid) = 'FW-01'
+  AND eventdirection = 'L2R'
+GROUP BY sourceip, hour_bucket
+HAVING COUNT(*) > 1000
+ORDER BY connections DESC
 LAST 7 DAYS
 ```
 
-### 4. Outbound Connection Spikes
-Monitors and highlights abnormal spikes in outbound network traffic volume. *(Note: QRadar uses `bucket` for time aggregation instead of `_time` like Splunk)*.
-```sql
-SELECT sourceIP, START(bucket) AS time, COUNT(*) AS count
-FROM events
-WHERE logsourceid = 71
-AND direction = 'outbound'
-GROUP BY sourceIP, bucket START '2025-06-15 00:00:00' STOP '2025-06-22 00:00:00' EVERY 1 HOUR
-HAVING count > 1000
-ORDER BY time DESC
-```
+> `eventdirection` values: `L2R` (local → remote), `R2L` (remote → local), `L2L`, `R2R`.
 
-### 5. High-Risk Connections
-Displays connections associated with high-risk or critical threat indicators. *(Note: Replace `category` with `threatName` or `eventCategory` based on available logs)*.
+### 5. High-Severity Events
+Events QRadar rates as high severity. `severity` is numeric (0–10), not text.
+
 ```sql
-SELECT sourceIP, category, COUNT(*) AS count
+SELECT sourceip, CATEGORYNAME(category) AS category_name, MAX(severity) AS max_severity, COUNT(*) AS events
 FROM events
-WHERE logsourceid = 71
-AND (severity = 'High' OR severity = 'Critical')
-GROUP BY sourceIP, category
-ORDER BY count DESC
+WHERE LOGSOURCENAME(logsourceid) = 'FW-01'
+  AND severity >= 7
+GROUP BY sourceip, category
+ORDER BY events DESC
 LAST 7 DAYS
 ```
 
-### 6. After-Hours VPN Connections
-Detects VPN access occurring outside of standard business hours. *(Ensure `username` and `startTime` fields are parsed)*.
+### 6. After-Hours VPN Logins
+Successful VPN logins outside business hours (22:00–05:59).
+
 ```sql
-SELECT sourceIP, username, HOUR(startTime) AS hour, COUNT(*) AS count
+SELECT username, sourceip, DATEFORMAT(starttime, 'yyyy-MM-dd HH:mm') AS login_time
 FROM events
-WHERE logsourceid = 71
-AND LOWER(category) LIKE '%vpn%'
-AND (HOUR(startTime) >= 22 OR HOUR(startTime) <= 5)
-GROUP BY sourceIP, username, hour
-ORDER BY count DESC
+WHERE LOGSOURCENAME(logsourceid) = 'VPN-01'
+  AND CATEGORYNAME(category) ILIKE '%login succe%'
+  AND DATEFORMAT(starttime, 'HH') IN ('22','23','00','01','02','03','04','05')
+ORDER BY starttime DESC
 LAST 7 DAYS
 ```
 
-### 7. Geographically Unusual Access
-Highlights allowed inbound connections originating from unexpected or unusual geographical locations. *(Requires GeoIP integration in QRadar)*.
+> `DATEFORMAT` follows the QRadar console time zone — adjust the hour list if your users work in a different zone.
+
+### 7. Inbound Allowed Traffic from Unexpected Countries
+Allowed inbound connections from outside your expected geography.
+
 ```sql
-SELECT sourceIP, geoCountry AS country, COUNT(*) AS count
+SELECT sourceip, GEO::LOOKUP(sourceip, 'country') AS country, destinationport, COUNT(*) AS connections
 FROM events
-WHERE logsourceid = 71
-AND LOWER(action) = 'allow'
-AND geoCountry NOT IN ('Saudi Arabia')
-GROUP BY sourceIP, country
-ORDER BY count DESC
+WHERE LOGSOURCENAME(logsourceid) = 'FW-01'
+  AND CATEGORYNAME(category) = 'Firewall Permit'
+  AND eventdirection = 'R2L'
+  AND GEO::LOOKUP(sourceip, 'country') <> 'Saudi Arabia'
+GROUP BY sourceip, destinationport
+ORDER BY connections DESC
 LAST 7 DAYS
 ```
 
 ### 8. Authentication Failure Patterns
-Analyzes repeated authentication failures to identify potential brute-force or credential stuffing attacks.
+Repeated login failures per user and source — brute-force or credential stuffing.
+
 ```sql
-SELECT sourceIP, username, COUNT(*) AS failures
+SELECT sourceip, username, COUNT(*) AS failures
 FROM events
-WHERE logsourceid = 71
-AND LOWER(eventCategory) = 'authentication'
-AND LOWER(status) = 'failure'
-GROUP BY sourceIP, username
-HAVING failures > 5
+WHERE LOGSOURCENAME(logsourceid) IN ('FW-01', 'VPN-01')
+  AND CATEGORYNAME(category) ILIKE '%login fail%'
+GROUP BY sourceip, username
+HAVING COUNT(*) > 5
 ORDER BY failures DESC
-LAST 7 DAYS
+LAST 24 HOURS
 ```
 
-### 9. Traffic to Malicious Domains
-Correlates network traffic with known threat intelligence indicators (e.g., Malware or C2 servers). *(Relies on Threat Intelligence feeds like IBM X-Force or MISP)*.
+### 9. Traffic to Known Malicious IPs
+Connections to IPs in a threat-intel reference set (populated from X-Force, MISP, or your own IoC feed).
+
 ```sql
-SELECT sourceIP, destinationHostname, threatCategory, COUNT(*) AS hits
+SELECT sourceip, destinationip, destinationport, COUNT(*) AS hits
 FROM events
-WHERE logsourceid = 71
-AND (LOWER(threatCategory) = 'malware' OR LOWER(threatCategory) = 'c2')
-GROUP BY sourceIP, destinationHostname, threatCategory
+WHERE LOGSOURCENAME(logsourceid) = 'FW-01'
+  AND REFERENCESETCONTAINS('Malicious IPs', destinationip)
+GROUP BY sourceip, destinationip, destinationport
 ORDER BY hits DESC
 LAST 7 DAYS
 ```
 
+> Replace `'Malicious IPs'` with the name of your reference set.
+
 ---
-**General Implementation Notes:**
-* **Log Source ID:** Verify and update `logsourceid = 71` to match the specific firewall log source ID in your QRadar environment.
-* **Timeframe:** Queries utilize `LAST 7 DAYS` as a default timeframe, which can be adjusted as needed.
-* **Field Parsing:** Field names such as `action`, `destinationPort`, and `sourceIP` may vary based on the specific device type (DSM) or log format.
+
+## 💡 Implementation Notes
+
+- **Category names** (`Firewall Deny`, `Firewall Permit`, login success/failure) come from QRadar's normalized low-level categories, so they work across firewall vendors (DSMs).
+- **Thresholds** (`> 15`, `> 1000`, `> 5`) are starting points — baseline your environment and tune them to reduce false positives.
+- **Time windows** default to `LAST 7 DAYS` / `LAST 24 HOURS`; adjust as needed.
+- **Performance:** always filter by log source and keep time windows tight on busy environments.
+
+## 👤 Author
+
+**Omar Alghamdi** — SOC Analyst | Threat Hunting
+[LinkedIn](https://www.linkedin.com/in/omar-al-ghamdi-) · [X](https://x.com/Omar_Cyber7)
